@@ -1,0 +1,219 @@
+{
+  "themes": [
+    {
+      "id": "valentine",
+      "name": "Valentine's Day 💕",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 2,
+        "day": 14,
+        "rangeDays": 3
+      },
+      "greeting": "Happy Valentine's Day, {name}! 💕",
+      "background": "radial-gradient(ellipse at 25% 15%, rgba(100, 0, 40, 0.55) 0%, transparent 50%), radial-gradient(ellipse at 75% 85%, rgba(80, 0, 35, 0.45) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(60, 5, 25, 0.30) 0%, transparent 65%), linear-gradient(160deg, #0e0308 0%, #160510 30%, #1c0712 55%, #130409 80%, #0a0206 100%)",
+      "bodyClass": "theme-valentine",
+      "effects": [
+        "hearts"
+      ]
+    },
+    {
+      "id": "new-year",
+      "name": "New Year 🎆",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 1,
+        "day": 1,
+        "rangeDays": 2
+      },
+      "greeting": "Happy New Year, {name}! 🎆",
+      "background": "radial-gradient(ellipse at 30% 20%, rgba(80, 60, 0, 0.40) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(50, 35, 0, 0.28) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(30, 20, 0, 0.20) 0%, transparent 65%), linear-gradient(160deg, #05050a 0%, #08080f 30%, #0c0b14 55%, #08070c 80%, #040408 100%)",
+      "bodyClass": "theme-new-year",
+      "effects": [
+        "fireworks"
+      ]
+    },
+    {
+      "id": "christmas",
+      "name": "Christmas 🎄",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 12,
+        "day": 25,
+        "rangeDays": 3
+      },
+      "greeting": "Merry Christmas, {name}! 🎄",
+      "background": "radial-gradient(ellipse at 20% 10%, rgba(0, 40, 12, 0.50) 0%, transparent 50%), radial-gradient(ellipse at 80% 90%, rgba(30, 0, 8, 0.40) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(5, 15, 8, 0.30) 0%, transparent 65%), linear-gradient(160deg, #030806 0%, #050e08 30%, #071008 55%, #050c07 80%, #030705 100%)",
+      "bodyClass": "theme-christmas",
+      "effects": [
+        "snow"
+      ]
+    },
+    {
+      "id": "rain",
+      "name": "Rainy Day 🌧️",
+      "enabled": true,
+      "trigger": {
+        "type": "weather",
+        "codes": [
+          60,
+          61,
+          63,
+          80
+        ]
+      },
+      "background": "radial-gradient(ellipse at 50% 0%, rgba(15, 30, 70, 0.50) 0%, transparent 60%), radial-gradient(ellipse at 50% 100%, rgba(8, 18, 45, 0.35) 0%, transparent 50%), linear-gradient(180deg, #040609 0%, #070b12 30%, #0a0f1a 55%, #06090f 80%, #030508 100%)",
+      "bodyClass": "theme-rain",
+      "effects": [
+        "rain",
+        "wet-glass"
+      ]
+    },
+    {
+      "id": "thunderstorm",
+      "name": "Thunderstorm ⛈️",
+      "enabled": true,
+      "trigger": {
+        "type": "weather",
+        "codes": [
+          95,
+          97
+        ]
+      },
+      "background": "radial-gradient(ellipse at 50% 30%, rgba(20, 10, 50, 0.40) 0%, transparent 50%), radial-gradient(ellipse at 30% 70%, rgba(10, 5, 30, 0.30) 0%, transparent 45%), linear-gradient(160deg, #020204 0%, #050508 30%, #07070c 55%, #050507 80%, #030304 100%)",
+      "bodyClass": "theme-thunderstorm",
+      "effects": [
+        "heavy-rain",
+        "lightning"
+      ]
+    },
+    {
+      "id": "fog",
+      "name": "Foggy ☁️",
+      "enabled": true,
+      "trigger": {
+        "type": "weather",
+        "codes": [
+          5,
+          10,
+          45
+        ]
+      },
+      "background": "radial-gradient(ellipse at 50% 50%, rgba(40, 45, 65, 0.35) 0%, transparent 70%), linear-gradient(160deg, #080a0e 0%, #0c0f14 30%, #0f1219 55%, #0b0e12 80%, #080a0d 100%)",
+      "bodyClass": "theme-fog",
+      "effects": [
+        "fog"
+      ]
+    },
+    {
+      "id": "idul-fitri",
+      "name": "Idul Fitri 🌙",
+      "enabled": true,
+      "trigger": {
+        "type": "hijri",
+        "month": 10,
+        "day": 1,
+        "rangeDays": 4
+      },
+      "greeting": "Selamat Idul Fitri, {name}! 🌙",
+      "background": "radial-gradient(ellipse at 30% 20%, rgba(80, 55, 0, 0.55) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(55, 38, 0, 0.38) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(40, 25, 0, 0.25) 0%, transparent 65%), linear-gradient(160deg, #090700 0%, #100a00 30%, #150d00 55%, #0d0900 80%, #070500 100%)",
+      "bodyClass": "theme-idul-fitri",
+      "effects": [
+        "lanterns",
+        "fireworks"
+      ]
+    },
+    {
+      "id": "idul-adha",
+      "name": "Idul Adha 🐑",
+      "enabled": true,
+      "trigger": {
+        "type": "hijri",
+        "month": 12,
+        "day": 10,
+        "rangeDays": 4
+      },
+      "greeting": "Selamat Idul Adha, {name}! 🐑",
+      "background": "radial-gradient(ellipse at 25% 18%, rgba(0, 42, 15, 0.55) 0%, transparent 50%), radial-gradient(ellipse at 72% 78%, rgba(38, 25, 0, 0.38) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(5, 18, 8, 0.28) 0%, transparent 65%), linear-gradient(160deg, #020806 0%, #050e07 30%, #07110a 55%, #050d07 80%, #030805 100%)",
+      "bodyClass": "theme-idul-adha",
+      "effects": [
+        "lanterns"
+      ]
+    },
+    {
+      "id": "hut-ri",
+      "name": "HUT RI 🇮🇩",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 8,
+        "day": 17,
+        "rangeDays": 2
+      },
+      "greeting": "Dirgahayu Indonesia! 🇮🇩",
+      "background": "radial-gradient(ellipse at 30% 20%, rgba(90, 0, 0, 0.58) 0%, transparent 50%), radial-gradient(ellipse at 70% 78%, rgba(60, 0, 0, 0.42) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(40, 0, 0, 0.25) 0%, transparent 65%), linear-gradient(160deg, #0e0202 0%, #160303 30%, #1b0404 55%, #130303 80%, #0a0202 100%)",
+      "bodyClass": "theme-hut-ri",
+      "effects": [
+        "fireworks"
+      ]
+    },
+    {
+      "id": "birthday-afifa",
+      "name": "Birthday Afifa 🎂",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 10,
+        "day": 11,
+        "rangeDays": 1
+      },
+      "greeting": "Happy Birthday, {name}! 🎂",
+      "background": "radial-gradient(ellipse at 28% 22%, rgba(65, 0, 85, 0.58) 0%, transparent 50%), radial-gradient(ellipse at 72% 75%, rgba(80, 0, 65, 0.42) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(40, 0, 50, 0.28) 0%, transparent 65%), linear-gradient(160deg, #090010 0%, #0f0018 30%, #140020 55%, #0f001a 80%, #080010 100%)",
+      "bodyClass": "theme-birthday",
+      "effects": [
+        "fireworks",
+        "confetti"
+      ]
+    },
+    {
+      "id": "birthday-yoga",
+      "name": "Birthday Yoga 🎂",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 11,
+        "day": 29,
+        "rangeDays": 1
+      },
+      "greeting": "Happy Birthday, {name}! 🎂",
+      "greetingName": "Yoga",
+      "background": "radial-gradient(ellipse at 28% 22%, rgba(0, 40, 85, 0.58) 0%, transparent 50%), radial-gradient(ellipse at 72% 75%, rgba(0, 25, 70, 0.42) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(0, 15, 50, 0.28) 0%, transparent 65%), linear-gradient(160deg, #000d18 0%, #001428 30%, #001835 55%, #00101e 80%, #000a12 100%)",
+      "bodyClass": "theme-birthday-yoga",
+      "effects": [
+        "fireworks",
+        "confetti"
+      ]
+    },
+    {
+      "id": "anniversary",
+      "name": "Anniversary 💑",
+      "enabled": true,
+      "trigger": {
+        "type": "date",
+        "month": 1,
+        "day": 1,
+        "rangeDays": 1
+      },
+      "_note": "Ganti month dan day sesuai tanggal anniversary kamu",
+      "greeting": "Happy Anniversary, {name}! 💑",
+      "background": "radial-gradient(ellipse at 30% 20%, rgba(70, 20, 42, 0.55) 0%, transparent 50%), radial-gradient(ellipse at 70% 75%, rgba(50, 10, 32, 0.42) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(35, 8, 22, 0.28) 0%, transparent 65%), linear-gradient(160deg, #0c0408 0%, #160609 30%, #1c070d 55%, #140508 80%, #0a0304 100%)",
+      "bodyClass": "theme-anniversary",
+      "effects": [
+        "hearts",
+        "petals"
+      ]
+    }
+  ]
+}

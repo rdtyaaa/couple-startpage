@@ -1,0 +1,10 @@
+[
+  {
+    "id": "birthday-morning",
+    "start": "2026-10-11",
+    "end": "2026-10-11",
+    "startTime": "00:00",
+    "endTime": "23:59",
+    "text": "Happy Birthday, {name}! 🎂"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "title": "WhatsApp",
+    "icon": "assets/icons/whatsapp.svg",
+    "url": "https://web.whatsapp.com"
+  },
+  {
+    "title": "YouTube",
+    "icon": "assets/icons/youtube.svg",
+    "url": "https://www.youtube.com"
+  },
+  {
+    "title": "Gmail",
+    "icon": "assets/icons/gmail.svg",
+    "url": "https://mail.google.com"
+  },
+  {
+    "title": "Drive",
+    "icon": "assets/icons/drive.svg",
+    "url": "https://drive.google.com"
+  },
+  {
+    "title": "ChatGPT",
+    "icon": "assets/icons/chatgpt.svg",
+    "url": "https://chat.openai.com"
+  },
+  {
+    "title": "Spotify",
+    "icon": "assets/icons/spotify.svg",
+    "url": "https://open.spotify.com"
+  },
+  {
+    "title": "Netflix",
+    "icon": "assets/icons/netflix.svg",
+    "url": "https://www.netflix.com"
+  },
+  {
+    "title": "Instagram",
+    "icon": "assets/icons/instagram.svg",
+    "url": "https://www.instagram.com"
+  }
+]

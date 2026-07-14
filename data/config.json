@@ -1,0 +1,26 @@
+{
+  "name": "Afifa",
+  "theme": "dark",
+  "searchEngine": "google",
+  "adm4": "31.71.01.1001",
+  "devMode": {
+    "theme": false,
+    "greeting": true
+  },
+  "names": [
+    "Afifa",
+    "Yoga"
+  ],
+  "specialDates": [
+    {
+      "label": "Ulang Tahun Afifa 🎂",
+      "month": 10,
+      "day": 11
+    },
+    {
+      "label": "Ulang Tahun Yoga 🎂",
+      "month": 11,
+      "day": 29
+    }
+  ]
+}
