@@ -74,14 +74,13 @@ export class MarketManager {
     const cached = this._getCache('market_gold');
     if (cached) return cached;
 
-    /* Try live API first */
+    /* 1. Try Vercel proxy first (works in production without CORS issues) */
     try {
-      return await this._fetchGoldLive(MarketManager.GOLD_URL);
+      return await this._fetchGoldLive('/api/gold');
     } catch {
-      /* Direct fetch failed (CORS), try proxy */
+      /* 2. Try direct live API (might work locally) */
       try {
-        const proxyUrl = MarketManager.CORS_PROXY + encodeURIComponent(MarketManager.GOLD_URL);
-        return await this._fetchGoldLive(proxyUrl);
+        return await this._fetchGoldLive(MarketManager.GOLD_URL);
       } catch {
         /* Both failed, throw error to handle gracefully */
         throw new Error('All gold fetches failed');
@@ -155,20 +154,23 @@ export class MarketManager {
    * @returns {Promise<object>}
    */
   async _fetchIHSGWithFallback() {
-    /* 1. Try direct (works on some browsers / environments) */
+    /* 1. Try Vercel proxy first */
+    try {
+      const res = await fetch('/api/ihsg');
+      if (res.ok) return res.json();
+    } catch {
+      /* Vercel proxy failed */
+    }
+
+    /* 2. Try direct (works on some browsers / environments) */
     try {
       const res = await fetch(MarketManager.IHSG_URL, { mode: 'cors' });
       if (res.ok) return res.json();
     } catch {
-      /* CORS blocked — try proxy */
+      /* CORS blocked — throw */
     }
 
-    /* 2. Try CORS proxy */
-    const proxyRes = await fetch(
-      MarketManager.CORS_PROXY + encodeURIComponent(MarketManager.IHSG_URL),
-    );
-    if (!proxyRes.ok) throw new Error('IHSG proxy failed');
-    return proxyRes.json();
+    throw new Error('IHSG proxy failed');
   }
 
   /* ------------------------------------------------------------------ */

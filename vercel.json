@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/gold",
+      "destination": "https://logam-mulia-api.iamutaki.workers.dev/api/prices/pegadaian"
+    },
+    {
+      "source": "/api/ihsg",
+      "destination": "https://query1.finance.yahoo.com/v8/finance/chart/%5EJKSE?interval=1d&range=1d"
+    }
+  ]
+}
