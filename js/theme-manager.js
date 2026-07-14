@@ -275,10 +275,10 @@ export class ThemeManager {
 
     const applyItem = (id) => {
       if (id === 'none') {
-        this._active = null; this._clear(false);
+        this._clear(false);
       } else {
         const theme = this._themes.find(t => t.id === id);
-        if (theme) { this._active = null; this._apply(theme); }
+        if (theme) { this._apply(theme); }
       }
       close();
     };
