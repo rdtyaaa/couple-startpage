@@ -83,8 +83,8 @@ export class MarketManager {
         const proxyUrl = MarketManager.CORS_PROXY + encodeURIComponent(MarketManager.GOLD_URL);
         return await this._fetchGoldLive(proxyUrl);
       } catch {
-        /* Both failed, fall back to local cache */
-        return await this._fetchGoldLocal();
+        /* Both failed, throw error to handle gracefully */
+        throw new Error('All gold fetches failed');
       }
     }
   }
@@ -118,32 +118,7 @@ export class MarketManager {
     return data;
   }
 
-  /**
-   * Fallback: baca harga emas dari data/market.json lokal.
-   * @returns {Promise<{ jual: number, beli: number, date: string }|null>}
-   */
-  async _fetchGoldLocal() {
-    const response = await fetch('data/market.json');
-    if (!response.ok) throw new Error('Local market.json not found');
 
-    const json = await response.json();
-    const item = json.gold;
-    if (!item) throw new Error('No gold data in market.json');
-
-    const weightGram = item.weight ?? 0.01;
-    const factor = 1 / weightGram;
-
-    const data = {
-      jual: Math.round(item.sellPrice * factor),
-      beli: Math.round(item.buybackPrice * factor),
-      date: item.recordedDate ?? '',
-    };
-
-    this._setCache('market_gold', data);
-    return data;
-  }
-
-  /* ------------------------------------------------------------------ */
   /* IHSG                                                                 */
   /* ------------------------------------------------------------------ */
 
@@ -210,6 +185,7 @@ export class MarketManager {
     /* Use document.getElementById — more reliable than element.querySelector('#id') */
     const goldEl = document.getElementById('market-gold');
     const ihsgEl = document.getElementById('market-ihsg');
+    const dividerEl = this._card ? this._card.querySelector('.market-divider') : null;
 
     /* ---- Gold ---- */
     if (gold && goldEl) {
@@ -223,7 +199,10 @@ export class MarketManager {
         ? `per ${this._formatDate(gold.date)}`
         : '';
 
+      goldEl.classList.remove('unavailable');
       goldEl.classList.add('loaded');
+    } else if (goldEl) {
+      goldEl.classList.add('unavailable');
     }
 
     /* ---- IHSG ---- */
@@ -242,14 +221,29 @@ export class MarketManager {
         changeEl.dataset.trend = ihsg.changePct >= 0 ? 'up' : 'down';
       }
 
+      ihsgEl.classList.remove('unavailable');
       ihsgEl.classList.add('loaded');
     } else if (ihsgEl) {
       /* Hide IHSG section gracefully if data unavailable */
       ihsgEl.classList.add('unavailable');
     }
 
-    /* Reveal the card */
-    if (this._card) this._card.classList.add('loaded');
+    /* ---- Divider ---- */
+    if (dividerEl) {
+      if (gold && ihsg) {
+        dividerEl.style.display = '';
+      } else {
+        dividerEl.style.display = 'none';
+      }
+    }
+
+    /* ---- Entire Card Visibility ---- */
+    if (!gold && !ihsg && this._card) {
+      this._card.style.display = 'none';
+    } else if (this._card) {
+      this._card.style.display = '';
+      this._card.classList.add('loaded');
+    }
   }
 
   /* ------------------------------------------------------------------ */

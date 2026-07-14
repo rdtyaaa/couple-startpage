@@ -614,6 +614,7 @@ body.search-mode #search-box {
   padding: var(--space-sm) var(--space-xs);
 }
 
+#market-gold.unavailable,
 #market-ihsg.unavailable {
   display: none;
 }
