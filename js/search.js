@@ -53,12 +53,30 @@ export class SearchManager {
       }
     });
 
-    /* Global Ctrl+K shortcut */
+    /* Global Keyboard Shortcuts & Type-to-Search */
     document.addEventListener('keydown', (e) => {
+      // Ignore if user is already typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+
+      // Handle Ctrl+K
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         this._input.focus();
         this._enterSearchMode();
+        return;
+      }
+
+      // Type-to-Search: Ignore if Ctrl, Alt, or Meta is pressed (allow shortcuts)
+      if (e.ctrlKey || e.altKey || e.metaKey) {
+        return;
+      }
+
+      // Check if it's a single printable character (a-z, 0-9, punctuation)
+      if (e.key.length === 1) {
+        this._input.focus();
+        // Do NOT preventDefault, so the character naturally goes into the newly focused input
       }
     });
   }
