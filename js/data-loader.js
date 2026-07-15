@@ -30,9 +30,9 @@ import { StorageManager } from './storage.js';
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
-const GITHUB_USER   = 'rdtyaaa';
-const GITHUB_REPO   = 'couple-startpage';
-const GITHUB_BRANCH = 'main';
+const GITHUB_USER = 'rdtyaaa';
+const GITHUB_REPO = 'couple-startpage';
+const GITHUB_BRANCH = 'master';
 
 /** jsDelivr CDN base URL for GitHub raw content */
 const JSDELIVR_BASE =
@@ -43,20 +43,20 @@ const JSDELIVR_BASE =
 
 const DEFAULTS = {
   'config.json': {
-    name:         'User',
-    theme:        'dark',
+    name: 'User',
+    theme: 'dark',
     searchEngine: 'google',
-    adm4:         '31.71.01.1001',
-    devMode:      { theme: false, greeting: false },
-    names:        ['User'],
+    adm4: '31.71.01.1001',
+    devMode: { theme: false, greeting: false },
+    names: ['User'],
     specialDates: [],
   },
   'greetings.json': [],
-  'letters.json':   [],
+  'letters.json': [],
   'quicklinks.json': [],
-  'themes.json':    { themes: [] },
-  'holidays.json':  { year: null, fetchedAt: null, holidays: [] },
-  'market.json':    {},
+  'themes.json': { themes: [] },
+  'holidays.json': { year: null, fetchedAt: null, holidays: [] },
+  'market.json': {},
 };
 
 /* ── DataLoader class ───────────────────────────────────────────────────── */
