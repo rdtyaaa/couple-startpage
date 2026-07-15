@@ -45,10 +45,10 @@ export class ThemeManager {
     /* Apply theme using any weather code already received */
     this._evaluate(this._weatherCode);
 
-    /* Dev shortcut: Alt+T — open theme selector popup (only if devMode enabled) */
+    /* Dev shortcut: Alt+V — open theme selector popup (only if devMode enabled) */
     if (this._devMode) {
       document.addEventListener('keydown', (e) => {
-        if (e.altKey && e.key.toLowerCase() === 't') {
+        if (e.altKey && e.key.toLowerCase() === 'v') {
           e.preventDefault();
           this._showDevPopup();
         }
@@ -241,7 +241,7 @@ export class ThemeManager {
           <span id="theme-dev-title">🎨 Dev Theme Selector</span>
           <button id="theme-dev-close" aria-label="Close">✕</button>
         </div>
-        <p id="theme-dev-hint">Alt+T to toggle · ↑↓ navigate · Enter select · Esc close</p>
+        <p id="theme-dev-hint">Alt+V to toggle · ↑↓ navigate · Enter select · Esc close</p>
         <ul id="theme-dev-list">
           ${allItems.map(item => `
             <li
