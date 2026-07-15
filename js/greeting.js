@@ -8,27 +8,34 @@
  *
  * Dev mode (Alt+C) — only name selection, controlled by config.devMode.greeting.
  * Arrow keys ↑↓ navigate the name list, Enter to apply, Esc to close.
+ *
+ * Data is injected via constructor (preloaded by DataLoader) instead of
+ * being fetched internally.
  */
 export class GreetingManager {
   /**
-   * @param {HTMLElement} element - the #greeting-text element
-   * @param {object} config - app config from config.json
+   * @param {HTMLElement} element   - the #greeting-text element
+   * @param {object}      config    - app config from config.json
+   * @param {Array}       [greetings=[]] - preloaded greetings array from DataLoader
    */
-  constructor(element, config) {
+  constructor(element, config, greetings = []) {
     this._el              = element;
     this._name            = config.name ?? 'User';
     this._names           = config.names?.length ? config.names : [config.name ?? 'User'];
     this._devMode         = config.devMode?.greeting ?? false;
 
     this._themeGreeting   = null;   // text set by ThemeManager (may contain {name})
-    this._customGreetings = [];     // from data/greetings.json
+    this._customGreetings = Array.isArray(greetings) ? greetings : [];
     this._devNameOverride = localStorage.getItem('homepage_name') ?? null;
   }
 
   /* ── Public ── */
 
-  async init() {
-    await this._loadCustomGreetings();
+  /**
+   * Initialize: render immediately (data already preloaded).
+   * No longer async — DataLoader injected greetings via constructor.
+   */
+  init() {
     this._render();
     if (this._devMode) this._registerShortcut();
   }
@@ -56,12 +63,6 @@ export class GreetingManager {
 
   /* ── Private ── */
 
-  async _loadCustomGreetings() {
-    try {
-      const res = await fetch('data/greetings.json');
-      if (res.ok) this._customGreetings = await res.json();
-    } catch { this._customGreetings = []; }
-  }
 
   _currentName() {
     return this._devNameOverride ?? this._name;

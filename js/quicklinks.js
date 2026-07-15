@@ -1,38 +1,41 @@
 /**
  * QuickLinksManager
- * Loads quick links from JSON and renders a modern grid of glass buttons.
+ * Renders a modern grid of glass buttons from preloaded quick links data.
  * Uses inline SVG injection for clean icon rendering without filter artifacts.
+ *
+ * Data is injected via constructor (preloaded by DataLoader) instead of
+ * being fetched internally.
+ *
+ * In Chrome Extension mode, relative icon paths (e.g. 'assets/icons/foo.svg')
+ * are resolved to absolute jsDelivr CDN URLs automatically so they load
+ * correctly from the extension context.
  */
 export class QuickLinksManager {
   /**
    * @param {HTMLElement} gridElement - the #quicklinks-grid element
+   * @param {Array}       [links=[]]  - preloaded links array from DataLoader
+   * @param {DataLoader}  [loader]    - DataLoader instance for icon URL resolution
    */
-  constructor(gridElement) {
-    this._grid = gridElement;
-    this._links = [];
+  constructor(gridElement, links = [], loader = null) {
+    this._grid   = gridElement;
+    this._links  = Array.isArray(links) ? links : [];
+    this._loader = loader;
   }
 
   /**
-   * Initialize: load links from JSON and render.
+   * Initialize: render links (data already loaded).
    */
   async init() {
     try {
-      this._links = await this._loadLinks();
+      if (!this._links.length) {
+        this._grid.style.display = 'none';
+        return;
+      }
       await this._render();
     } catch {
       /* Quick links unavailable — fail silently */
       this._grid.style.display = 'none';
     }
-  }
-
-  /**
-   * Load quick links from quicklinks.json.
-   * @returns {Promise<Array>}
-   */
-  async _loadLinks() {
-    const response = await fetch('data/quicklinks.json');
-    if (!response.ok) throw new Error('Failed to load quicklinks.json');
-    return response.json();
   }
 
   /**
@@ -56,7 +59,8 @@ export class QuickLinksManager {
 
       /* Fetch SVG and inject inline so currentColor works */
       try {
-        const res = await fetch(link.icon);
+        const iconUrl = this._resolveIconUrl(link.icon);
+        const res = await fetch(iconUrl);
         const svgText = await res.text();
         iconWrapper.innerHTML = svgText;
 
@@ -85,5 +89,30 @@ export class QuickLinksManager {
     }
 
     this._grid.appendChild(fragment);
+  }
+
+  /**
+   * Resolve an icon path to a fetch-able URL.
+   *
+   * - If the path is already an absolute URL (http/https), use as-is.
+   * - If running in extension mode, prefix the jsDelivr assets base URL.
+   * - Otherwise, use the relative path as-is (works on website).
+   *
+   * @param {string} iconPath - path from quicklinks.json (e.g. 'assets/icons/foo.svg')
+   * @returns {string}
+   */
+  _resolveIconUrl(iconPath) {
+    /* Already absolute — use as-is */
+    if (iconPath.startsWith('http://') || iconPath.startsWith('https://')) {
+      return iconPath;
+    }
+
+    /* Extension mode — resolve to jsDelivr CDN */
+    if (this._loader?.isExtension) {
+      return `${this._loader.remoteBase}/${iconPath}`;
+    }
+
+    /* Website mode — relative path, served from same origin */
+    return iconPath;
   }
 }

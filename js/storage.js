@@ -1,6 +1,7 @@
 /**
  * StorageManager
- * Wraps localStorage for bubble seen-today tracking and future preferences.
+ * Wraps localStorage for bubble seen-today tracking, future preferences,
+ * and DataLoader offline cache.
  */
 export class StorageManager {
   /** @param {string} prefix - namespace for storage keys */
@@ -74,5 +75,49 @@ export class StorageManager {
   markBubbleSeen() {
     const today = new Date().toISOString().slice(0, 10);
     this.set('bubble_last_seen', today);
+  }
+
+  /* ── DataLoader Cache ── */
+
+  /**
+   * Read a cached JSON payload. Returns null if missing or expired.
+   * @param {string} key         - cache key (e.g. 'cache:config.json')
+   * @param {number} [ttlMs]     - max age in ms; omit for no expiry check
+   * @returns {*|null}
+   */
+  getCache(key, ttlMs) {
+    try {
+      const raw = localStorage.getItem(this._key(key));
+      if (!raw) return null;
+      const { data, timestamp } = JSON.parse(raw);
+      if (ttlMs !== undefined && Date.now() - timestamp > ttlMs) return null;
+      return data ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write a JSON payload to cache with the current timestamp.
+   * @param {string} key
+   * @param {*}      data
+   */
+  setCache(key, data) {
+    try {
+      localStorage.setItem(
+        this._key(key),
+        JSON.stringify({ data, timestamp: Date.now() }),
+      );
+    } catch {
+      /* Storage full or unavailable — fail silently */
+    }
+  }
+
+  /**
+   * Remove a specific cache entry.
+   * @param {string} key
+   */
+  clearCache(key) {
+    this.remove(key);
   }
 }

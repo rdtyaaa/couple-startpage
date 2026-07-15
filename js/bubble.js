@@ -3,6 +3,9 @@
  * Shows a floating iMessage-style chat bubble with timed personal messages.
  * Appears on every page load and auto-hides after 20 seconds.
  *
+ * Data is injected via constructor (preloaded by DataLoader) instead of
+ * being fetched internally.
+ *
  * Letter schema:
  * {
  *   "id":        number,
@@ -18,39 +21,30 @@
  */
 export class BubbleManager {
   /**
-   * @param {HTMLElement} messageElement - the #bubble-message element
-   * @param {import('./storage.js').StorageManager} storage
+   * @param {HTMLElement}   messageElement - the #bubble-message element
+   * @param {StorageManager} storage
+   * @param {Array}         [letters=[]]   - preloaded letters array from DataLoader
    */
-  constructor(messageElement, storage) {
+  constructor(messageElement, storage, letters = []) {
     this._messageEl = messageElement;
-    this._storage = storage;
+    this._storage   = storage;
+    this._letters   = Array.isArray(letters) ? letters : [];
     this._hideTimer = null;
   }
 
   /**
-   * Initialize: load letters, check if one should be shown now.
+   * Initialize: process injected letters data.
+   * No longer async — DataLoader injected letters via constructor.
    */
-  async init() {
+  init() {
     try {
-      const letters = await this._loadLetters();
-      const active = this._findActiveLetter(letters);
-
+      const active = this._findActiveLetter(this._letters);
       if (active) {
         this._show(active.message);
       }
     } catch {
-      /* Letters unavailable — fail silently */
+      /* Letters processing failed — fail silently */
     }
-  }
-
-  /**
-   * Load letters from letters.json.
-   * @returns {Promise<Array>}
-   */
-  async _loadLetters() {
-    const response = await fetch('data/letters.json');
-    if (!response.ok) throw new Error('Failed to load letters.json');
-    return response.json();
   }
 
   /**

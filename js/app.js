@@ -1,23 +1,27 @@
 /**
  * App — Orchestrator
- * Loads config and initializes all managers in order.
+ * Initializes DataLoader first, preloads all JSON data in parallel,
+ * then passes data directly to each manager. No manager fetches data
+ * on its own — DataLoader is the single source of truth.
  */
-import { StorageManager } from './storage.js';
+import { DataLoader }        from './data-loader.js';
+import { StorageManager }    from './storage.js';
 import { BackgroundManager } from './background.js';
-import { GreetingManager } from './greeting.js';
-import { ClockManager } from './clock.js';
-import { SearchManager } from './search.js';
-import { WeatherManager } from './weather.js';
+import { GreetingManager }   from './greeting.js';
+import { ClockManager }      from './clock.js';
+import { SearchManager }     from './search.js';
+import { WeatherManager }    from './weather.js';
 import { QuickLinksManager } from './quicklinks.js';
-import { BubbleManager } from './bubble.js';
-import { MarketManager } from './market.js';
-import { SidebarManager } from './sidebar.js';
-import { ThemeManager } from './theme-manager.js';
-import { HolidayManager } from './holidays.js';
+import { BubbleManager }     from './bubble.js';
+import { MarketManager }     from './market.js';
+import { SidebarManager }    from './sidebar.js';
+import { ThemeManager }      from './theme-manager.js';
+import { HolidayManager }    from './holidays.js';
 
 class App {
   constructor() {
-    this._config = null;
+    this._data     = null;   // preloaded JSON map
+    this._loader   = null;   // DataLoader instance (shared for icon URL resolution)
     this._managers = {};
   }
 
@@ -25,30 +29,18 @@ class App {
    * Bootstrap the application.
    */
   async init() {
-    try {
-      this._config = await this._loadConfig();
-    } catch {
-      /* Fallback config if file is unavailable */
-      this._config = {
-        name: 'User',
-        theme: 'dark',
-        searchEngine: 'google',
-        adm4: '31.71.01.1001',
-      };
-    }
+    /* ── 1. Bootstrap DataLoader & StorageManager ── */
+    const storage = new StorageManager('homepage');
+    this._loader  = new DataLoader(storage);
 
-    this._applyTheme(this._config.theme);
-    this._initManagers();
-  }
+    /* ── 2. Preload all JSON data in parallel (with fallback) ── */
+    this._data = await this._loader.preloadAll();
 
-  /**
-   * Load configuration from config.json.
-   * @returns {Promise<object>}
-   */
-  async _loadConfig() {
-    const response = await fetch('data/config.json');
-    if (!response.ok) throw new Error('Failed to load config.json');
-    return response.json();
+    /* ── 3. Apply base theme immediately to avoid flash ── */
+    this._applyTheme(this._data.config.theme ?? 'dark');
+
+    /* ── 4. Initialize all managers ── */
+    await this._initManagers(storage);
   }
 
   /**
@@ -60,24 +52,26 @@ class App {
   }
 
   /**
-   * Initialize all managers.
+   * Initialize all managers, passing preloaded data via constructor args.
+   * @param {StorageManager} storage
    */
-  async _initManagers() {
-    const storage = new StorageManager('homepage');
+  async _initManagers(storage) {
+    const { config, greetings, letters, quicklinks, themes } = this._data;
 
     /* Background */
     const backgroundEl = document.getElementById('background');
-    const background = new BackgroundManager(backgroundEl);
+    const background   = new BackgroundManager(backgroundEl);
     background.init();
 
-    /* Greeting — pass full config for devMode + names support */
+    /* Greeting — receives config + preloaded greetings array */
     const greetingEl = document.getElementById('greeting-text');
-    const greeting = new GreetingManager(greetingEl, this._config);
-    await greeting.init();
+    const greeting   = new GreetingManager(greetingEl, config, greetings);
+    greeting.init(); // no longer async (data already loaded)
 
-    /* Theme Manager — pass devMode flag and greeting change callback */
+    /* Theme Manager — receives preloaded themes array */
     const theme = new ThemeManager(background, {
-      devMode:          this._config.devMode?.theme ?? true,
+      themes:           themes.themes ?? [],
+      devMode:          config.devMode?.theme ?? true,
       onGreetingChange: (text) => {
         if (text) greeting.setThemeGreeting(text);
         else      greeting.clearThemeGreeting();
@@ -92,45 +86,45 @@ class App {
     /* Clock */
     const clockTimeEl = document.getElementById('clock-time');
     const clockDateEl = document.getElementById('clock-date');
-    const clock = new ClockManager(clockTimeEl, clockDateEl);
+    const clock        = new ClockManager(clockTimeEl, clockDateEl);
     clock.init();
 
     /* Search */
     const search = new SearchManager({
-      input: document.getElementById('search-input'),
-      dropdown: document.getElementById('autocomplete-dropdown'),
+      input:     document.getElementById('search-input'),
+      dropdown:  document.getElementById('autocomplete-dropdown'),
       container: document.getElementById('search-container'),
-      shortcut: document.getElementById('search-shortcut'),
+      shortcut:  document.getElementById('search-shortcut'),
     });
     search.init();
 
     /* Weather — callback notifies ThemeManager of the weather code */
     const weatherCard = document.getElementById('weather-card');
-    const weather = new WeatherManager(
+    const weather     = new WeatherManager(
       weatherCard,
-      this._config.adm4,
+      config.adm4,
       (data) => theme.setWeatherCode(data.weatherCode),
     );
     weather.init();
 
-    /* Quick Links */
+    /* Quick Links — receives preloaded links + dataLoader for icon URL resolution */
     const quicklinksGrid = document.getElementById('quicklinks-grid');
-    const quicklinks = new QuickLinksManager(quicklinksGrid);
-    quicklinks.init();
+    const ql             = new QuickLinksManager(quicklinksGrid, quicklinks, this._loader);
+    ql.init();
 
-    /* Market Prices */
+    /* Market Prices — unchanged; fetches from external APIs */
     const marketCard = document.getElementById('market-card');
-    const market = new MarketManager(marketCard);
+    const market     = new MarketManager(marketCard);
     market.init();
 
-    /* Letter Bubble (delayed for entrance effect) */
+    /* Letter Bubble — receives preloaded letters (delayed for entrance effect) */
     const bubbleMessage = document.getElementById('bubble-message');
-    const bubble = new BubbleManager(bubbleMessage, storage);
+    const bubble        = new BubbleManager(bubbleMessage, storage, letters);
     setTimeout(() => bubble.init(), 2000);
 
-    /* Holiday Widget */
+    /* Holiday Widget — unchanged; fetches national holidays from nager.at */
     const holidayCard = document.getElementById('holiday-card');
-    const holidays = new HolidayManager(holidayCard, this._config);
+    const holidays    = new HolidayManager(holidayCard, config);
     holidays.init();
 
     /* Sidebar toggle */
@@ -140,7 +134,7 @@ class App {
     /* Store references */
     this._managers = {
       storage, background, greeting, clock,
-      search, weather, quicklinks, market,
+      search, weather, ql, market,
       bubble, sidebar, theme, holidays,
     };
   }

@@ -1,8 +1,12 @@
 /**
  * ThemeManager
- * Loads themes.json and automatically activates the right theme based on:
+ * Evaluates preloaded theme definitions and automatically activates the right
+ * theme based on:
  *  1. Current date / Hijri date (highest priority)
  *  2. Current weather code
+ *
+ * Theme data is injected via constructor options (preloaded by DataLoader)
+ * instead of being fetched internally.
  *
  * Dev shortcut: Alt+T — opens theme selector popup (only if devMode.theme is true).
  */
@@ -12,42 +16,31 @@ export class ThemeManager {
   /**
    * @param {BackgroundManager} bgManager
    * @param {object} [opts]
-   * @param {boolean} [opts.devMode=true]
+   * @param {Array}    [opts.themes=[]]       - preloaded themes array from DataLoader
+   * @param {boolean}  [opts.devMode=true]
    * @param {function} [opts.onGreetingChange] - called with (text|null) when a theme greeting changes
    */
   constructor(bgManager, opts = {}) {
     this._bg               = bgManager;
-    this._themes           = [];
+    this._themes           = Array.isArray(opts.themes) ? opts.themes : [];
     this._active           = null;
     this._effects          = null;
     this._weatherCode      = null;
-    this._ready            = false;
     this._devMode          = opts.devMode ?? true;
     this._onGreetingChange = opts.onGreetingChange ?? null;
   }
 
   /**
-   * Load theme definitions and apply the appropriate theme.
+   * Initialize the effects engine and apply the appropriate theme.
+   * No longer async — theme definitions are injected via constructor opts.
    * Call setWeatherCode() any time after init() to trigger re-evaluation.
    */
-  async init() {
-    /* Load theme definitions */
-    try {
-      const res  = await fetch('data/themes.json');
-      const data = await res.json();
-      this._themes = data.themes || [];
-    } catch (err) {
-      console.warn('[ThemeManager] Could not load themes.json:', err);
-      this._themes = [];
-    }
-
+  init() {
     /* Init effects engine */
     const canvas = document.getElementById('effects-canvas');
     if (canvas) {
       this._effects = new ThemeEffectsManager(canvas);
     }
-
-    this._ready = true;
 
     /* Apply theme using any weather code already received */
     this._evaluate(this._weatherCode);
@@ -71,7 +64,6 @@ export class ThemeManager {
    */
   setWeatherCode(code) {
     this._weatherCode = code;
-    if (!this._ready) return;
     /* Don't override an active date theme */
     if (this._active?.trigger?.type === 'date') return;
     this._evaluate(code);
