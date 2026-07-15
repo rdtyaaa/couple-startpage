@@ -22,12 +22,34 @@ A calm, elegant, and feature-rich new tab experience built with Vanilla HTML, CS
 
 ## 📦 Installation & Setup
 
+This project can be used both as a standard website and as a native Chrome Extension. Data is fetched centrally from GitHub via jsDelivr CDN, so you only need to update the JSON files in this repository to update the app content without republishing the extension!
+
+### Option A: Use as Chrome Extension (Recommended)
+
+1. Clone this repository or download the ZIP:
+   ```bash
+   git clone https://github.com/rdtyaaa/couple-startpage.git
+   ```
+2. Open Google Chrome and go to `chrome://extensions/`.
+3. Enable **Developer mode** (toggle in the top right corner).
+4. Click **Load unpacked** and select the cloned folder.
+5. Open a new tab! The start page will now appear automatically.
+
+### Option B: Use as Website
+
 1. Clone this repository:
    ```bash
    git clone https://github.com/rdtyaaa/couple-startpage.git
    ```
-2. Open `index.html` in your browser, or set it as your browser's default New Tab page using a custom new tab extension.
-3. (Optional) Run `update-market.ps1` to fetch the latest market data if required.
+2. Open `index.html` in your browser (preferably using a local server like Live Server).
+3. Set it as your browser's default New Tab page using a custom new tab extension if desired.
+
+## 🔄 Updating Data
+
+All content (config, greetings, quicklinks, themes, etc.) is stored in the `data/` directory. To update your start page:
+1. Edit the respective JSON files in the `data/` folder.
+2. Commit and push the changes to the `main` branch on GitHub.
+3. Your extension/website will automatically fetch the latest data (it may take ~5-10 minutes for the CDN cache to update).
 
 ## ⌨️ Keyboard Shortcuts
 
