@@ -1,6 +1,14 @@
 /**
  * SearchManager
  * Handles the search box, Search Mode (Spotlight-like), and Google Autocomplete.
+ *
+ * Improvements:
+ *  - Recent searches shown on empty focus (with timestamps for smart sorting)
+ *  - Per-item delete (×) button on recent searches
+ *  - "Clear all" button in the recent searches header
+ *  - Matched query substring highlighted in suggestion text
+ *  - Tab key completes the top suggestion
+ *  - Stagger entrance animation on dropdown items
  */
 export class SearchManager {
   /**
@@ -11,56 +19,67 @@ export class SearchManager {
    * @param {HTMLElement} elements.shortcut
    */
   constructor(elements) {
-    this._input = elements.input;
-    this._dropdown = elements.dropdown;
-    this._container = elements.container;
-    this._shortcut = elements.shortcut;
+    this._input      = elements.input;
+    this._dropdown   = elements.dropdown;
+    this._container  = elements.container;
+    this._shortcut   = elements.shortcut;
 
-    this._isSearchMode = false;
-    this._suggestions = [];
-    this._activeIndex = -1;
-    this._debounceTimer = null;
+    this._isSearchMode   = false;
+    this._suggestions    = [];   // { text, isRecent, ts? }
+    this._activeIndex    = -1;
+    this._debounceTimer  = null;
+    this._originalValue  = '';   // tracks value before arrow-key navigation
+
+    /** @type {{ text: string, ts: number }[]} */
     this._recentSearches = this._loadRecentSearches();
   }
 
-  /**
-   * Initialize event listeners.
-   */
+  /* ─────────────────────────────────────────
+     PUBLIC
+  ───────────────────────────────────────── */
+
   init() {
     this._bindEvents();
     this._bindDropdownEvents();
   }
 
-  /**
-   * Bind all event listeners.
-   */
-  _bindEvents() {
-    /* Focus / click on search box enters Search Mode */
-    this._input.addEventListener('focus', () => this._enterSearchMode());
+  /* ─────────────────────────────────────────
+     EVENT BINDING
+  ───────────────────────────────────────── */
 
-    /* Input changes trigger autocomplete */
+  _bindEvents() {
+    /* Focus → enter Search Mode + show recents if empty */
+    this._input.addEventListener('focus', () => {
+      this._enterSearchMode();
+      if (!this._input.value.trim()) {
+        this._showRecentSearches();
+      }
+    });
+
+    /* Input changes → debounced autocomplete */
     this._input.addEventListener('input', () => {
-      this._debounce(() => this._fetchSuggestions(), 250);
+      this._originalValue = this._input.value;
+      this._debounce(() => this._fetchSuggestions(), 220);
     });
 
     /* Keyboard navigation */
     this._input.addEventListener('keydown', (e) => this._handleKeydown(e));
 
-    /* Click outside exits Search Mode */
+    /* Click outside → exit Search Mode */
     document.addEventListener('click', (e) => {
       if (this._isSearchMode && !this._container.contains(e.target)) {
         this._exitSearchMode();
       }
     });
 
-    /* Global Keyboard Shortcuts & Type-to-Search */
+    /* Global shortcuts & type-to-search */
     document.addEventListener('keydown', (e) => {
-      // Ignore if user is already typing in an input or textarea
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-        return;
-      }
+      if (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.isContentEditable
+      ) return;
 
-      // Handle Ctrl+K
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         this._input.focus();
@@ -68,22 +87,19 @@ export class SearchManager {
         return;
       }
 
-      // Type-to-Search: Ignore if Ctrl, Alt, or Meta is pressed (allow shortcuts)
-      if (e.ctrlKey || e.altKey || e.metaKey) {
-        return;
-      }
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
 
-      // Check if it's a single printable character (a-z, 0-9, punctuation)
       if (e.key.length === 1) {
         this._input.focus();
-        // Do NOT preventDefault, so the character naturally goes into the newly focused input
+        // character naturally goes into the focused input
       }
     });
   }
 
-  /**
-   * Enter Search Mode — fades other elements, expands search.
-   */
+  /* ─────────────────────────────────────────
+     SEARCH MODE
+  ───────────────────────────────────────── */
+
   _enterSearchMode() {
     if (this._isSearchMode) return;
     this._isSearchMode = true;
@@ -94,9 +110,6 @@ export class SearchManager {
     }
   }
 
-  /**
-   * Exit Search Mode — restores all elements.
-   */
   _exitSearchMode() {
     if (!this._isSearchMode) return;
     this._isSearchMode = false;
@@ -105,10 +118,10 @@ export class SearchManager {
     this._input.blur();
   }
 
-  /**
-   * Handle keydown events on the search input.
-   * @param {KeyboardEvent} e
-   */
+  /* ─────────────────────────────────────────
+     KEYBOARD HANDLING
+  ───────────────────────────────────────── */
+
   _handleKeydown(e) {
     switch (e.key) {
       case 'Escape':
@@ -126,6 +139,13 @@ export class SearchManager {
         this._navigateSuggestions(-1);
         break;
 
+      case 'Tab':
+        if (this._suggestions.length > 0) {
+          e.preventDefault();
+          this._navigateSuggestions(e.shiftKey ? -1 : 1);
+        }
+        break;
+
       case 'Enter':
         e.preventDefault();
         if (this._activeIndex >= 0 && this._activeIndex < this._suggestions.length) {
@@ -140,10 +160,10 @@ export class SearchManager {
     }
   }
 
-  /**
-   * Navigate autocomplete suggestions with arrow keys.
-   * @param {number} direction - 1 for down, -1 for up
-   */
+  /* ─────────────────────────────────────────
+     NAVIGATION
+  ───────────────────────────────────────── */
+
   _navigateSuggestions(direction) {
     if (this._suggestions.length === 0) return;
 
@@ -157,91 +177,144 @@ export class SearchManager {
 
     this._updateActiveItem();
 
-    /* Update input to show highlighted suggestion */
+    /* Reflect highlighted suggestion in input, restore original on -1 */
     if (this._activeIndex >= 0) {
       this._input.value = this._suggestions[this._activeIndex].text;
+    } else {
+      this._input.value = this._originalValue;
     }
   }
 
-  /**
-   * Load recent searches from localStorage.
-   * @returns {string[]}
-   */
+  /* ─────────────────────────────────────────
+     RECENT SEARCHES — STORAGE
+  ───────────────────────────────────────── */
+
+  /** @returns {{ text: string, ts: number }[]} */
   _loadRecentSearches() {
     try {
-      const saved = localStorage.getItem('recent_searches');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('recent_searches_v2');
+      if (saved) return JSON.parse(saved);
+
+      /* Migrate legacy flat-string format */
+      const legacy = localStorage.getItem('recent_searches');
+      if (legacy) {
+        const arr = JSON.parse(legacy);
+        return arr.map((text, i) => ({ text, ts: Date.now() - i * 1000 }));
+      }
+      return [];
     } catch {
       return [];
     }
   }
 
-  /**
-   * Save a query to recent searches.
-   * @param {string} query
-   */
-  _saveRecentSearch(query) {
-    const trimmed = query.trim();
-    if (!trimmed) return;
-
-    // Remove if already exists to move to top
-    this._recentSearches = this._recentSearches.filter(s => s.toLowerCase() !== trimmed.toLowerCase());
-    
-    // Add to top
-    this._recentSearches.unshift(trimmed);
-
-    // Keep only last 50
-    if (this._recentSearches.length > 50) {
-      this._recentSearches.pop();
-    }
-
+  _persistRecentSearches() {
     try {
-      localStorage.setItem('recent_searches', JSON.stringify(this._recentSearches));
+      localStorage.setItem('recent_searches_v2', JSON.stringify(this._recentSearches));
     } catch (e) {
       console.error('Failed to save recent searches', e);
     }
   }
 
   /**
-   * Perform a Google search.
+   * Add a query to recent searches (deduped, most-recent first).
    * @param {string} query
    */
-  _search(query) {
-    if (!query) return;
-    this._saveRecentSearch(query);
-    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    window.location.href = url;
+  _saveRecentSearch(query) {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    this._recentSearches = this._recentSearches.filter(
+      s => s.text.toLowerCase() !== trimmed.toLowerCase()
+    );
+    this._recentSearches.unshift({ text: trimmed, ts: Date.now() });
+
+    if (this._recentSearches.length > 50) this._recentSearches.pop();
+    this._persistRecentSearches();
   }
 
   /**
-   * Fetch autocomplete suggestions (local + Google).
+   * Remove a single recent search by text.
+   * @param {string} text
+   */
+  _deleteRecentSearch(text) {
+    this._recentSearches = this._recentSearches.filter(
+      s => s.text.toLowerCase() !== text.toLowerCase()
+    );
+    this._persistRecentSearches();
+  }
+
+  /** Clear all recent searches. */
+  _clearAllRecentSearches() {
+    this._recentSearches = [];
+    this._persistRecentSearches();
+  }
+
+  /* ─────────────────────────────────────────
+     SEARCH
+  ───────────────────────────────────────── */
+
+  _search(query) {
+    if (!query) return;
+    this._saveRecentSearch(query);
+    window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  }
+
+  /* ─────────────────────────────────────────
+     SUGGESTIONS — FETCH
+  ───────────────────────────────────────── */
+
+  /**
+   * Show recent searches when the input is empty (on focus).
+   */
+  _showRecentSearches() {
+    if (this._recentSearches.length === 0) return;
+
+    /* Sort by recency (ts desc) — already stored that way, but be safe */
+    const sorted = [...this._recentSearches]
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 6);
+
+    this._suggestions = sorted.map(s => ({ text: s.text, isRecent: true }));
+    this._activeIndex = -1;
+
+    if (this._isSearchMode) {
+      this._renderSuggestions('', true);
+      this._showSuggestions();
+    }
+  }
+
+  /**
+   * Fetch autocomplete suggestions (local recents + Google).
    */
   async _fetchSuggestions() {
     const query = this._input.value.trim();
+
     if (!query) {
-      this._suggestions = [];
-      this._hideSuggestions();
+      this._showRecentSearches();
       return;
     }
 
     const lowerQuery = query.toLowerCase();
-    
-    // 1. Get matching recent searches
-    const matchedRecents = this._recentSearches
-      .filter(s => s.toLowerCase().includes(lowerQuery))
-      .slice(0, 3) // Max 3 local suggestions
-      .map(s => ({ text: s, isRecent: true }));
 
-    // 2. Fetch Google suggestions
+    /* 1. Matching recent searches */
+    const matchedRecents = this._recentSearches
+      .filter(s => s.text.toLowerCase().includes(lowerQuery))
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 3)
+      .map(s => ({ text: s.text, isRecent: true }));
+
+    /* 2. Google suggestions */
     let googleSuggestions = [];
     try {
-      const response = await fetch(`https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`);
+      const response = await fetch(
+        `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`
+      );
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && Array.isArray(data[1])) {
           googleSuggestions = data[1]
-            .filter(s => !matchedRecents.some(r => r.text.toLowerCase() === s.toLowerCase())) // Avoid duplicates
-            .slice(0, 6 - matchedRecents.length) // Fill remaining slots (up to 6 total)
+            .filter(s => !matchedRecents.some(r => r.text.toLowerCase() === s.toLowerCase()))
+            .slice(0, 6 - matchedRecents.length)
             .map(s => ({ text: s, isRecent: false }));
         }
       }
@@ -249,29 +322,48 @@ export class SearchManager {
       console.warn('Failed to fetch Google suggestions:', e);
     }
 
-    // 3. Combine
+    /* 3. Combine */
     this._suggestions = [...matchedRecents, ...googleSuggestions];
     this._activeIndex = -1;
 
     if (this._suggestions.length > 0 && this._isSearchMode) {
-      this._renderSuggestions();
+      this._renderSuggestions(query, false);
       this._showSuggestions();
     } else {
       this._hideSuggestions();
     }
   }
 
+  /* ─────────────────────────────────────────
+     SUGGESTIONS — RENDER
+  ───────────────────────────────────────── */
+
   /**
-   * Render autocomplete suggestions into the dropdown.
-   * Uses event delegation — listeners are on the container, not individual items.
+   * Render suggestions into the dropdown.
+   * @param {string} query   - current input value (used for highlight)
+   * @param {boolean} isEmptyState - true when showing recents on empty input
    */
-  _renderSuggestions() {
-    this._dropdown.innerHTML = this._suggestions
+  _renderSuggestions(query, isEmptyState) {
+    const hasRecents = this._suggestions.some(s => s.isRecent);
+
+    /* ── Header (only when showing recents) ── */
+    let headerHtml = '';
+    if (isEmptyState && hasRecents) {
+      headerHtml = `
+        <div class="autocomplete-header">
+          <span class="autocomplete-header-label">Recent</span>
+          <button class="autocomplete-clear-all" data-action="clear-all" title="Clear all recent searches">
+            Clear all
+          </button>
+        </div>`;
+    }
+
+    /* ── Items ── */
+    const itemsHtml = this._suggestions
       .map((suggestion, index) => {
         const isActive = index === this._activeIndex;
-        
-        // Use a clock icon for recent searches, magnifying glass for Google
-        const iconSvg = suggestion.isRecent 
+
+        const iconSvg = suggestion.isRecent
           ? `<svg class="autocomplete-item-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                <circle cx="10" cy="10" r="7"/>
                <path d="M10 6V10L13 13" stroke-linecap="round" stroke-linejoin="round"/>
@@ -281,42 +373,101 @@ export class SearchManager {
                <line x1="12.5" y1="12.5" x2="17" y2="17" stroke-linecap="round"/>
              </svg>`;
 
+        const labelHtml = query
+          ? this._highlightMatch(suggestion.text, query)
+          : this._escapeHtml(suggestion.text);
+
+        const deleteBtn = suggestion.isRecent
+          ? `<button class="autocomplete-item-delete" data-action="delete" data-text="${this._escapeAttr(suggestion.text)}" title="Remove">
+               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                 <line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/>
+               </svg>
+             </button>`
+          : '';
+
         return `
           <div class="autocomplete-item${isActive ? ' active' : ''}"
-               data-index="${index}">
+               data-index="${index}"
+               style="--item-index: ${index}">
             ${iconSvg}
-            <span>${this._escapeHtml(suggestion.text)}</span>
-          </div>
-        `;
+            <span class="autocomplete-item-text">${labelHtml}</span>
+            ${deleteBtn}
+          </div>`;
       })
       .join('');
+
+    /* ── Footer hint (Tab to complete) ── */
+    const footerHtml = this._suggestions.length > 0
+      ? `<div class="autocomplete-footer">
+           <span class="autocomplete-footer-hint">
+             <kbd>↑↓</kbd> navigate &nbsp;·&nbsp; <kbd>Tab</kbd> complete &nbsp;·&nbsp; <kbd>↵</kbd> search
+           </span>
+         </div>`
+      : '';
+
+    this._dropdown.innerHTML = headerHtml + itemsHtml + footerHtml;
   }
 
-  /**
-   * Bind event delegation on the dropdown (called once during init).
-   */
+  /* ─────────────────────────────────────────
+     DROPDOWN EVENTS (delegation)
+  ───────────────────────────────────────── */
+
   _bindDropdownEvents() {
-    /* Use mousedown instead of click — fires before blur/DOM changes */
+    /* mousedown fires before blur — prevents input losing focus */
     this._dropdown.addEventListener('mousedown', (e) => {
-      e.preventDefault(); /* Prevent input from losing focus */
+      e.preventDefault();
+
+      /* Delete button */
+      const deleteBtn = e.target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        const text = deleteBtn.dataset.text;
+        this._deleteRecentSearch(text);
+        this._suggestions = this._suggestions.filter(
+          s => s.text.toLowerCase() !== text.toLowerCase()
+        );
+        if (this._suggestions.length === 0) {
+          this._hideSuggestions();
+        } else {
+          const query = this._input.value.trim();
+          this._renderSuggestions(query, !query);
+        }
+        return;
+      }
+
+      /* Clear all button */
+      const clearAll = e.target.closest('[data-action="clear-all"]');
+      if (clearAll) {
+        this._clearAllRecentSearches();
+        this._hideSuggestions();
+        return;
+      }
+
+      /* Regular item click */
       const item = e.target.closest('.autocomplete-item');
       if (!item) return;
       const index = parseInt(item.dataset.index, 10);
       this._search(this._suggestions[index].text);
     });
 
-    /* Hover: toggle active class without rebuilding DOM */
+    /* Hover: update active without re-render */
     this._dropdown.addEventListener('mouseover', (e) => {
       const item = e.target.closest('.autocomplete-item');
       if (!item) return;
       this._activeIndex = parseInt(item.dataset.index, 10);
       this._updateActiveItem();
     });
+
+    /* Mouse leaves dropdown → reset active to -1 */
+    this._dropdown.addEventListener('mouseleave', () => {
+      this._activeIndex = -1;
+      this._updateActiveItem();
+    });
   }
 
-  /**
-   * Update the active class on autocomplete items without re-rendering.
-   */
+  /* ─────────────────────────────────────────
+     HELPERS
+  ───────────────────────────────────────── */
+
   _updateActiveItem() {
     const items = this._dropdown.querySelectorAll('.autocomplete-item');
     items.forEach((item, i) => {
@@ -324,16 +475,10 @@ export class SearchManager {
     });
   }
 
-  /**
-   * Show the autocomplete dropdown.
-   */
   _showSuggestions() {
     this._dropdown.classList.add('visible');
   }
 
-  /**
-   * Hide the autocomplete dropdown.
-   */
   _hideSuggestions() {
     this._dropdown.classList.remove('visible');
     this._suggestions = [];
@@ -341,21 +486,31 @@ export class SearchManager {
   }
 
   /**
-   * Escape HTML to prevent XSS in suggestion rendering.
-   * @param {string} str
-   * @returns {string}
+   * Wrap matched substring in a <mark> for highlighting.
+   * @param {string} text
+   * @param {string} query
+   * @returns {string} safe HTML
    */
+  _highlightMatch(text, query) {
+    const escaped = this._escapeHtml(text);
+    const escapedQuery = this._escapeHtml(query);
+    const regex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escaped.replace(regex, '<mark class="autocomplete-highlight">$1</mark>');
+  }
+
+  /** Escape HTML to prevent XSS. */
   _escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
   }
 
-  /**
-   * Simple debounce utility.
-   * @param {Function} fn
-   * @param {number} delay
-   */
+  /** Escape for use in HTML attribute values. */
+  _escapeAttr(str) {
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /** Simple debounce. */
   _debounce(fn, delay) {
     clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(fn, delay);
