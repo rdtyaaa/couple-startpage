@@ -20,8 +20,7 @@ export class SearchManager {
     this._suggestions = [];
     this._activeIndex = -1;
     this._debounceTimer = null;
-    this._currentScript = null;
-    this._currentCallback = null;
+    this._recentSearches = this._loadRecentSearches();
   }
 
   /**
@@ -112,7 +111,7 @@ export class SearchManager {
       case 'Enter':
         e.preventDefault();
         if (this._activeIndex >= 0 && this._activeIndex < this._suggestions.length) {
-          this._search(this._suggestions[this._activeIndex]);
+          this._search(this._suggestions[this._activeIndex].text);
         } else if (this._input.value.trim()) {
           this._search(this._input.value.trim());
         }
@@ -142,7 +141,46 @@ export class SearchManager {
 
     /* Update input to show highlighted suggestion */
     if (this._activeIndex >= 0) {
-      this._input.value = this._suggestions[this._activeIndex];
+      this._input.value = this._suggestions[this._activeIndex].text;
+    }
+  }
+
+  /**
+   * Load recent searches from localStorage.
+   * @returns {string[]}
+   */
+  _loadRecentSearches() {
+    try {
+      const saved = localStorage.getItem('recent_searches');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Save a query to recent searches.
+   * @param {string} query
+   */
+  _saveRecentSearch(query) {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    // Remove if already exists to move to top
+    this._recentSearches = this._recentSearches.filter(s => s.toLowerCase() !== trimmed.toLowerCase());
+    
+    // Add to top
+    this._recentSearches.unshift(trimmed);
+
+    // Keep only last 50
+    if (this._recentSearches.length > 50) {
+      this._recentSearches.pop();
+    }
+
+    try {
+      localStorage.setItem('recent_searches', JSON.stringify(this._recentSearches));
+    } catch (e) {
+      console.error('Failed to save recent searches', e);
     }
   }
 
@@ -152,12 +190,13 @@ export class SearchManager {
    */
   _search(query) {
     if (!query) return;
+    this._saveRecentSearch(query);
     const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
     window.location.href = url;
   }
 
   /**
-   * Fetch autocomplete suggestions from Google using JSONP.
+   * Fetch autocomplete suggestions (local + Google).
    */
   async _fetchSuggestions() {
     const query = this._input.value.trim();
@@ -167,72 +206,41 @@ export class SearchManager {
       return;
     }
 
+    const lowerQuery = query.toLowerCase();
+    
+    // 1. Get matching recent searches
+    const matchedRecents = this._recentSearches
+      .filter(s => s.toLowerCase().includes(lowerQuery))
+      .slice(0, 3) // Max 3 local suggestions
+      .map(s => ({ text: s, isRecent: true }));
+
+    // 2. Fetch Google suggestions
+    let googleSuggestions = [];
     try {
-      const results = await this._jsonpFetch(query);
-      this._suggestions = results.slice(0, 6);
-      this._activeIndex = -1;
-      if (this._suggestions.length > 0 && this._isSearchMode) {
-        this._renderSuggestions();
-        this._showSuggestions();
-      } else {
-        this._hideSuggestions();
+      const response = await fetch(`https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && Array.isArray(data[1])) {
+          googleSuggestions = data[1]
+            .filter(s => !matchedRecents.some(r => r.text.toLowerCase() === s.toLowerCase())) // Avoid duplicates
+            .slice(0, 6 - matchedRecents.length) // Fill remaining slots (up to 6 total)
+            .map(s => ({ text: s, isRecent: false }));
+        }
       }
-    } catch {
+    } catch (e) {
+      console.warn('Failed to fetch Google suggestions:', e);
+    }
+
+    // 3. Combine
+    this._suggestions = [...matchedRecents, ...googleSuggestions];
+    this._activeIndex = -1;
+
+    if (this._suggestions.length > 0 && this._isSearchMode) {
+      this._renderSuggestions();
+      this._showSuggestions();
+    } else {
       this._hideSuggestions();
     }
-  }
-
-  /**
-   * JSONP fetch for Google Suggest API (bypasses CORS).
-   * @param {string} query
-   * @returns {Promise<string[]>}
-   */
-  _jsonpFetch(query) {
-    return new Promise((resolve) => {
-      /* Clean up previous JSONP call */
-      this._cleanupJsonp();
-
-      const callbackName = `_gac_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      this._currentCallback = callbackName;
-
-      const script = document.createElement('script');
-      this._currentScript = script;
-
-      const timeout = setTimeout(() => {
-        resolve([]);
-        this._cleanupJsonp();
-      }, 3000);
-
-      window[callbackName] = (data) => {
-        clearTimeout(timeout);
-        /* Google Suggest response: [query, [suggestions], ...] */
-        resolve(Array.isArray(data[1]) ? data[1] : []);
-        this._cleanupJsonp();
-      };
-
-      script.src = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query)}&callback=${callbackName}`;
-      script.onerror = () => {
-        clearTimeout(timeout);
-        resolve([]);
-        this._cleanupJsonp();
-      };
-
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
-   * Clean up JSONP script and callback.
-   */
-  _cleanupJsonp() {
-    if (this._currentCallback && window[this._currentCallback]) {
-      delete window[this._currentCallback];
-    }
-    if (this._currentScript && this._currentScript.parentNode) {
-      this._currentScript.remove();
-    }
-    this._currentScript = null;
-    this._currentCallback = null;
   }
 
   /**
@@ -243,14 +251,23 @@ export class SearchManager {
     this._dropdown.innerHTML = this._suggestions
       .map((suggestion, index) => {
         const isActive = index === this._activeIndex;
+        
+        // Use a clock icon for recent searches, magnifying glass for Google
+        const iconSvg = suggestion.isRecent 
+          ? `<svg class="autocomplete-item-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+               <circle cx="10" cy="10" r="7"/>
+               <path d="M10 6V10L13 13" stroke-linecap="round" stroke-linejoin="round"/>
+             </svg>`
+          : `<svg class="autocomplete-item-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+               <circle cx="8.5" cy="8.5" r="5.5"/>
+               <line x1="12.5" y1="12.5" x2="17" y2="17" stroke-linecap="round"/>
+             </svg>`;
+
         return `
           <div class="autocomplete-item${isActive ? ' active' : ''}"
                data-index="${index}">
-            <svg class="autocomplete-item-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-              <circle cx="8.5" cy="8.5" r="5.5"/>
-              <line x1="12.5" y1="12.5" x2="17" y2="17" stroke-linecap="round"/>
-            </svg>
-            <span>${this._escapeHtml(suggestion)}</span>
+            ${iconSvg}
+            <span>${this._escapeHtml(suggestion.text)}</span>
           </div>
         `;
       })
@@ -267,7 +284,7 @@ export class SearchManager {
       const item = e.target.closest('.autocomplete-item');
       if (!item) return;
       const index = parseInt(item.dataset.index, 10);
-      this._search(this._suggestions[index]);
+      this._search(this._suggestions[index].text);
     });
 
     /* Hover: toggle active class without rebuilding DOM */
