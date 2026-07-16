@@ -41,6 +41,9 @@ class App {
 
     /* ── 4. Initialize all managers ── */
     await this._initManagers(storage);
+
+    /* ── 5. Reveal page (smooth fade from opacity:0) ── */
+    document.body.classList.add('ready');
   }
 
   /**
@@ -107,10 +110,10 @@ class App {
     );
     weather.init();
 
-    /* Quick Links — receives preloaded links + dataLoader for icon URL resolution */
+    /* Quick Links — await so icons are ready before body reveals */
     const quicklinksGrid = document.getElementById('quicklinks-grid');
     const ql             = new QuickLinksManager(quicklinksGrid, quicklinks, this._loader);
-    ql.init();
+    await ql.init();
 
     /* Market Prices — unchanged; fetches from external APIs */
     const marketCard = document.getElementById('market-card');

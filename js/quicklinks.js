@@ -44,9 +44,19 @@ export class QuickLinksManager {
   async _render() {
     this._grid.innerHTML = '';
 
+    /* Fetch all SVGs in parallel */
+    const svgTexts = await Promise.all(
+      this._links.map(link =>
+        fetch(this._resolveIconUrl(link.icon))
+          .then(r => r.text())
+          .catch(() => null)
+      )
+    );
+
     const fragment = document.createDocumentFragment();
 
-    for (const link of this._links) {
+    for (let i = 0; i < this._links.length; i++) {
+      const link = this._links[i];
       const a = document.createElement('a');
       a.className = 'quicklink-item';
       a.href = link.url;
@@ -57,22 +67,15 @@ export class QuickLinksManager {
       const iconWrapper = document.createElement('div');
       iconWrapper.className = 'quicklink-icon-wrapper';
 
-      /* Fetch SVG and inject inline so currentColor works */
-      try {
-        const iconUrl = this._resolveIconUrl(link.icon);
-        const res = await fetch(iconUrl);
-        const svgText = await res.text();
-        iconWrapper.innerHTML = svgText;
-
-        /* Ensure the inline SVG has proper sizing */
+      if (svgTexts[i]) {
+        iconWrapper.innerHTML = svgTexts[i];
         const svg = iconWrapper.querySelector('svg');
         if (svg) {
           svg.setAttribute('width', '24');
           svg.setAttribute('height', '24');
           svg.classList.add('quicklink-icon');
         }
-      } catch {
-        /* Fallback: show first letter */
+      } else {
         const fallback = document.createElement('span');
         fallback.className = 'quicklink-icon-fallback';
         fallback.textContent = link.title.charAt(0);

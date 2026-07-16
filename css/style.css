@@ -6,9 +6,6 @@
    Theme: Dark (default), Light (prepared)
    ======================================== */
 
-/* ---- Google Fonts ---- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
-
 /* ---- CSS Custom Properties ---- */
 :root {
   /* Typography */
@@ -276,27 +273,27 @@ input {
 
 .section {
   opacity: 0;
-  animation: fadeInUp 0.7s var(--ease-out) forwards;
+  animation: fadeInUp 0.5s var(--ease-out) forwards;
 }
 
 #greeting-section {
-  animation-delay: 0.05s;
+  animation-delay: 0s;
   margin-bottom: var(--space-md);
 }
 
 #clock-section {
-  animation-delay: 0.15s;
+  animation-delay: 0.07s;
   margin-bottom: var(--space-2xl);
 }
 
 #search-section {
-  animation-delay: 0.25s;
+  animation-delay: 0.14s;
   margin-bottom: var(--space-2xl);
   z-index: 10;
 }
 
 #quicklinks-section {
-  animation-delay: 0.35s;
+  animation-delay: 0.21s;
 }
 
 /* ========================================

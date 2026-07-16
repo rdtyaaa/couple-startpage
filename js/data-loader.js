@@ -118,38 +118,42 @@ export class DataLoader {
   async load(filename) {
     const cacheKey = `cache:${filename}`;
 
-    /* ── 1. Attempt remote fetch ── */
+    /* ── 1. Background fetch (Stale-While-Revalidate) ── */
+    const fetchPromise = this._fetchRemote(filename)
+      .then(data => {
+        this._storage.setCache(cacheKey, data);
+        return data;
+      })
+      .catch(err => {
+        console.warn(`[DataLoader] Background fetch failed for ${filename}:`, err.message ?? err);
+        throw err;
+      });
+
+    /* ── 2. Check localStorage cache for instant load ── */
+    const cached = this._storage.getCache(cacheKey);
+    if (cached !== null) {
+      console.info(`[DataLoader] ✓ Loaded ${filename} (cache)`);
+      return cached; // Return immediately, unblocking the UI!
+    }
+
+    /* ── 3. If no cache, wait for the remote fetch ── */
     try {
-      const data = await this._fetchRemote(filename);
-      /* Persist to localStorage for offline fallback */
-      this._storage.setCache(cacheKey, data);
+      const data = await fetchPromise;
       const src = this.isExtension ? 'jsDelivr CDN' : 'local';
       console.info(`[DataLoader] ✓ Loaded ${filename} (${src})`);
       return data;
     } catch (err) {
-      console.warn(`[DataLoader] Remote fetch failed for ${filename}:`, err.message ?? err);
+      /* ── 4. Hardcoded defaults ── */
+      const defaults = DEFAULTS[filename];
+      if (defaults !== undefined) {
+        console.error(
+          `[DataLoader] No cache available for ${filename} — using hardcoded defaults. ` +
+          'Check network connectivity or GitHub repository.',
+        );
+        return structuredClone(defaults);
+      }
+      return null;
     }
-
-    /* ── 2. Attempt localStorage cache (no TTL — offline safety net) ── */
-    const cached = this._storage.getCache(cacheKey);
-    if (cached !== null) {
-      console.warn(`[DataLoader] Using localStorage cache for ${filename} (offline mode)`);
-      return cached;
-    }
-
-    /* ── 3. Hardcoded defaults ── */
-    const defaults = DEFAULTS[filename];
-    if (defaults !== undefined) {
-      console.error(
-        `[DataLoader] No cache available for ${filename} — using hardcoded defaults. ` +
-        'Check network connectivity or GitHub repository.',
-      );
-      return structuredClone(defaults);
-    }
-
-    /* Should never reach here for known files */
-    console.error(`[DataLoader] No fallback for ${filename} — returning null`);
-    return null;
   }
 
   /**

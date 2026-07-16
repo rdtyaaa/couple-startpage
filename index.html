@@ -7,9 +7,28 @@
   <meta name="description" content="Premium personalized homepage — a calm, elegant new tab experience." />
   <title>Start Page</title>
 
+  <!-- Prevent flash on load + smooth entrance -->
+  <style>
+    html, body {
+      background-color: #0a0a12;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+    body.ready {
+      opacity: 1;
+    }
+  </style>
+
   <!-- Preconnect for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Google Fonts (non-blocking) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" media="print" onload="this.media='all'" />
 
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css" />
