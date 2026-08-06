@@ -3,7 +3,22 @@
  * Canvas-based particle effects engine and CSS effect helpers.
  * All canvas effects run in a shared requestAnimationFrame loop.
  * CSS-based effects (fog, wet-glass, lightning) manipulate the DOM directly.
+ *
+ * Performance & correctness fixes:
+ *  1. Page Visibility API — RAF loop pauses when tab is hidden, resumes when
+ *     visible again. Prevents particle/timer accumulation during sleep.
+ *  2. Delta-time capped at 100ms — if the browser was suspended for any reason,
+ *     the first resumed frame's Δt is clamped so particles don't teleport.
+ *  3. LightningEffect & FireworksEffect use visibility-aware timers that
+ *     restart cleanly on tab-show instead of stacking.
+ *  4. Canvas resize debounced to avoid thrash.
  */
+
+/* ── visibility state ─────────────────────────────────────────── */
+let _tabVisible = !document.hidden;
+document.addEventListener('visibilitychange', () => {
+  _tabVisible = !document.hidden;
+});
 
 /* ========================================
    BASE
@@ -13,9 +28,10 @@ class BaseEffect {
     this._canvas = canvas;
     this._ctx = ctx;
   }
-  init()       {}
-  update()     {}
-  destroy()    {}
+  /** @param {number} dt - capped delta-time in seconds */
+  init()        {}
+  update(dt)    {}
+  destroy()     {}
 }
 
 /* ========================================
@@ -48,11 +64,13 @@ class RainEffect extends BaseEffect {
     };
   }
 
-  update() {
-    const ctx = this._ctx;
-    const rad = (this._angleDeg * Math.PI) / 180;
+  update(dt) {
+    const ctx  = this._ctx;
+    const rad  = (this._angleDeg * Math.PI) / 180;
     const sinA = Math.sin(rad);
     const cosA = Math.cos(rad);
+    /* Normalise against 60 fps baseline */
+    const t = dt * 60;
 
     ctx.save();
     ctx.strokeStyle = 'rgba(180, 220, 255, 1)';
@@ -66,8 +84,8 @@ class RainEffect extends BaseEffect {
       ctx.lineTo(d.x + sinA * d.length, d.y + cosA * d.length);
       ctx.stroke();
 
-      d.x += sinA * d.speed;
-      d.y += cosA * d.speed;
+      d.x += sinA * d.speed * t;
+      d.y += cosA * d.speed * t;
 
       if (d.y > this._canvas.height + 40 || d.x > this._canvas.width + 40) {
         Object.assign(d, this._makeDrop(true));
@@ -97,6 +115,7 @@ class LightningEffect extends BaseEffect {
     super(canvas, ctx);
     this._timer   = null;
     this._overlay = null;
+    this._paused  = false;
   }
 
   init() {
@@ -111,6 +130,20 @@ class LightningEffect extends BaseEffect {
     });
     document.body.appendChild(this._overlay);
     this._schedule();
+
+    /* Pause timers when tab is hidden, resume when visible */
+    this._visHandler = () => {
+      if (!document.hidden) {
+        if (this._paused) { this._paused = false; this._schedule(); }
+      } else {
+        clearTimeout(this._timer);
+        this._timer  = null;
+        this._paused = true;
+        /* Reset any mid-flash state */
+        if (this._overlay) this._overlay.style.background = 'rgba(200, 220, 255, 0)';
+      }
+    };
+    document.addEventListener('visibilitychange', this._visHandler);
   }
 
   _schedule() {
@@ -124,7 +157,6 @@ class LightningEffect extends BaseEffect {
     setTimeout(() => {
       if (!this._overlay) return;
       this._overlay.style.background = 'rgba(200, 220, 255, 0)';
-      /* Sometimes a second flash */
       if (Math.random() > 0.45) {
         setTimeout(() => {
           if (!this._overlay) return;
@@ -139,6 +171,7 @@ class LightningEffect extends BaseEffect {
 
   destroy() {
     clearTimeout(this._timer);
+    if (this._visHandler) document.removeEventListener('visibilitychange', this._visHandler);
     this._overlay?.remove();
     this._overlay = null;
   }
@@ -173,7 +206,6 @@ class HeartsEffect extends BaseEffect {
     };
   }
 
-  /* Parametric heart curve */
   _drawHeart(ctx, cx, cy, size) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -189,8 +221,9 @@ class HeartsEffect extends BaseEffect {
     ctx.restore();
   }
 
-  update() {
+  update(dt) {
     const ctx = this._ctx;
+    const t   = dt * 60;
     for (const h of this._hearts) {
       ctx.save();
       ctx.globalAlpha = h.opacity;
@@ -201,9 +234,9 @@ class HeartsEffect extends BaseEffect {
       ctx.fill();
       ctx.restore();
 
-      h.y        -= h.speedY;
-      h.wobble   += h.wobbleSpd;
-      h.opacity  -= 0.00055;
+      h.y       -= h.speedY * t;
+      h.wobble  += h.wobbleSpd * t;
+      h.opacity -= 0.00055 * t;
 
       if (h.y < -70 || h.opacity <= 0) Object.assign(h, this._makeHeart());
     }
@@ -238,9 +271,10 @@ class SnowEffect extends BaseEffect {
     };
   }
 
-  update() {
+  update(dt) {
     const ctx    = this._ctx;
     const canvas = this._canvas;
+    const t      = dt * 60;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
 
     for (const f of this._flakes) {
@@ -249,9 +283,9 @@ class SnowEffect extends BaseEffect {
       ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
       ctx.fill();
 
-      f.y        += f.speed;
-      f.x        += Math.sin(f.wobble) * 0.55 + f.drift;
-      f.wobble   += f.wobbleSpd;
+      f.y      += f.speed * t;
+      f.x      += (Math.sin(f.wobble) * 0.55 + f.drift) * t;
+      f.wobble += f.wobbleSpd * t;
 
       if (f.y > canvas.height + 20) Object.assign(f, this._makeFlake(true));
     }
@@ -268,9 +302,25 @@ class FireworksEffect extends BaseEffect {
     this._rockets   = [];
     this._particles = [];
     this._timer     = null;
+    this._paused    = false;
   }
 
-  init()    { this._scheduleLaunch(); }
+  init() {
+    this._scheduleLaunch();
+    this._visHandler = () => {
+      if (!document.hidden) {
+        if (this._paused) { this._paused = false; this._scheduleLaunch(); }
+      } else {
+        clearTimeout(this._timer);
+        this._timer  = null;
+        this._paused = true;
+        /* Clear in-flight rockets/particles so none stack up */
+        this._rockets   = [];
+        this._particles = [];
+      }
+    };
+    document.addEventListener('visibilitychange', this._visHandler);
+  }
 
   _scheduleLaunch() {
     const delay = 700 + Math.random() * 1400;
@@ -309,31 +359,33 @@ class FireworksEffect extends BaseEffect {
     }
   }
 
-  update() {
+  update(dt) {
     const ctx = this._ctx;
+    const t   = dt * 60;
 
-    /* Rockets */
+    /* Cap particle count to prevent memory blow-up */
+    if (this._particles.length > 1800) this._particles.splice(0, 300);
+
     for (let i = this._rockets.length - 1; i >= 0; i--) {
       const r = this._rockets[i];
       r.trail.push({ x: r.x, y: r.y });
       if (r.trail.length > 14) r.trail.shift();
 
-      r.trail.forEach((t, idx) => {
+      r.trail.forEach((pt, idx) => {
         ctx.globalAlpha = (idx / r.trail.length) * 0.7;
         ctx.fillStyle   = r.color;
         ctx.beginPath();
-        ctx.arc(t.x, t.y, 1.4, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, 1.4, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      r.y -= r.speed;
+      r.y -= r.speed * t;
       if (r.y <= r.targetY) {
         this._burst(r.x, r.y, r.color);
         this._rockets.splice(i, 1);
       }
     }
 
-    /* Burst particles */
     for (let i = this._particles.length - 1; i >= 0; i--) {
       const p = this._particles[i];
       ctx.globalAlpha = Math.max(0, p.opacity);
@@ -342,13 +394,13 @@ class FireworksEffect extends BaseEffect {
       ctx.arc(p.x, p.y, Math.max(0.1, p.size), 0, Math.PI * 2);
       ctx.fill();
 
-      p.x  += p.vx;
-      p.y  += p.vy;
-      p.vy += p.gravity;
-      p.vx *= p.drag;
-      p.vy *= p.drag;
-      p.opacity -= p.fade;
-      p.size    *= 0.993;
+      p.x       += p.vx * t;
+      p.y       += p.vy * t;
+      p.vy      += p.gravity * t;
+      p.vx      *= Math.pow(p.drag, t);
+      p.vy      *= Math.pow(p.drag, t);
+      p.opacity -= p.fade * t;
+      p.size    *= Math.pow(0.993, t);
 
       if (p.opacity <= 0) this._particles.splice(i, 1);
     }
@@ -358,6 +410,7 @@ class FireworksEffect extends BaseEffect {
 
   destroy() {
     clearTimeout(this._timer);
+    if (this._visHandler) document.removeEventListener('visibilitychange', this._visHandler);
     this._rockets   = [];
     this._particles = [];
   }
@@ -441,9 +494,10 @@ class ConfettiEffect extends BaseEffect {
     };
   }
 
-  update() {
+  update(dt) {
     const ctx    = this._ctx;
     const canvas = this._canvas;
+    const t      = dt * 60;
     for (const p of this._pieces) {
       ctx.save();
       ctx.globalAlpha = p.opacity;
@@ -453,10 +507,10 @@ class ConfettiEffect extends BaseEffect {
       ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
       ctx.restore();
 
-      p.y        += p.speedY;
-      p.x        += Math.sin(p.wobble) * 1.2 + p.drift;
-      p.rotation += p.rotSpd;
-      p.wobble   += p.wobbleSpd;
+      p.y        += p.speedY * t;
+      p.x        += (Math.sin(p.wobble) * 1.2 + p.drift) * t;
+      p.rotation += p.rotSpd * t;
+      p.wobble   += p.wobbleSpd * t;
 
       if (p.y > canvas.height + 20) Object.assign(p, this._makePiece(true));
     }
@@ -483,8 +537,8 @@ class PetalsEffect extends BaseEffect {
     return {
       x:         Math.random() * width,
       y:         fromTop ? -25 : Math.random() * height,
-      rx:        5 + Math.random() * 10,   /* petal horizontal radius */
-      ry:        9 + Math.random() * 14,   /* petal vertical radius */
+      rx:        5 + Math.random() * 10,
+      ry:        9 + Math.random() * 14,
       color:     COLORS[Math.floor(Math.random() * COLORS.length)],
       rotation:  Math.random() * Math.PI * 2,
       rotSpd:    (Math.random() - 0.5) * 0.03,
@@ -495,9 +549,10 @@ class PetalsEffect extends BaseEffect {
     };
   }
 
-  update() {
+  update(dt) {
     const ctx    = this._ctx;
     const canvas = this._canvas;
+    const t      = dt * 60;
     for (const p of this._petals) {
       ctx.save();
       ctx.globalAlpha = p.opacity;
@@ -509,9 +564,9 @@ class PetalsEffect extends BaseEffect {
       ctx.fill();
       ctx.restore();
 
-      p.y        += p.speedY;
-      p.wobble   += p.wobbleSpd;
-      p.rotation += p.rotSpd;
+      p.y        += p.speedY * t;
+      p.wobble   += p.wobbleSpd * t;
+      p.rotation += p.rotSpd * t;
 
       if (p.y > canvas.height + 30) Object.assign(p, this._makePetal(true));
     }
@@ -535,24 +590,24 @@ class LanternsEffect extends BaseEffect {
   _makeLantern() {
     const { width, height } = this._canvas;
     const PALETTE = [
-      { r: 255, g: 210, b: 0   },  /* gold */
-      { r: 255, g: 155, b: 0   },  /* amber */
-      { r: 255, g: 90,  b: 30  },  /* orange-red */
-      { r: 255, g: 240, b: 130 },  /* pale gold */
+      { r: 255, g: 210, b: 0   },
+      { r: 255, g: 155, b: 0   },
+      { r: 255, g: 90,  b: 30  },
+      { r: 255, g: 240, b: 130 },
     ];
     const c = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     return {
-      x:         Math.random() * width,
-      y:         height + 40 + Math.random() * 250,
-      w:         14 + Math.random() * 16,
-      h:         20 + Math.random() * 18,
+      x:          Math.random() * width,
+      y:          height + 40 + Math.random() * 250,
+      w:          14 + Math.random() * 16,
+      h:          20 + Math.random() * 18,
       r: c.r, g: c.g, b: c.b,
-      speedY:    0.35 + Math.random() * 0.75,
-      drift:     (Math.random() - 0.5) * 0.38,
-      wobble:    Math.random() * Math.PI * 2,
-      wobbleSpd: 0.008 + Math.random() * 0.012,
-      opacity:   0.50 + Math.random() * 0.45,
-      flicker:   Math.random() * Math.PI * 2,
+      speedY:     0.35 + Math.random() * 0.75,
+      drift:      (Math.random() - 0.5) * 0.38,
+      wobble:     Math.random() * Math.PI * 2,
+      wobbleSpd:  0.008 + Math.random() * 0.012,
+      opacity:    0.50 + Math.random() * 0.45,
+      flicker:    Math.random() * Math.PI * 2,
       flickerSpd: 0.05 + Math.random() * 0.08,
     };
   }
@@ -561,7 +616,6 @@ class LanternsEffect extends BaseEffect {
     const { w, h, r, g, b, flicker } = l;
     const glowA = 0.28 + Math.sin(flicker) * 0.10;
 
-    /* Outer glow */
     const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 1.6);
     grd.addColorStop(0, `rgba(${r},${g},${b},${glowA + 0.20})`);
     grd.addColorStop(1, 'rgba(0,0,0,0)');
@@ -570,21 +624,17 @@ class LanternsEffect extends BaseEffect {
     ctx.ellipse(0, 0, w * 1.6, h * 1.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    /* Body */
     ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
     ctx.beginPath();
     ctx.ellipse(0, 0, w * 0.46, h * 0.48, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    /* Top cap */
     ctx.fillStyle = `rgba(${Math.min(r+40,255)},${Math.min(g+40,255)},${Math.min(b+40,255)},0.5)`;
     ctx.fillRect(-w * 0.28, -h * 0.50, w * 0.56, h * 0.10);
 
-    /* Bottom cap */
     ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
     ctx.fillRect(-w * 0.20, h * 0.42, w * 0.40, h * 0.09);
 
-    /* String */
     ctx.strokeStyle = `rgba(${r},${Math.floor(g*0.7)},0,0.50)`;
     ctx.lineWidth = 0.7;
     ctx.beginPath();
@@ -593,9 +643,10 @@ class LanternsEffect extends BaseEffect {
     ctx.stroke();
   }
 
-  update() {
+  update(dt) {
     const ctx    = this._ctx;
     const canvas = this._canvas;
+    const t      = dt * 60;
     for (const l of this._lanterns) {
       ctx.save();
       ctx.globalAlpha = l.opacity;
@@ -603,10 +654,10 @@ class LanternsEffect extends BaseEffect {
       this._draw(ctx, l);
       ctx.restore();
 
-      l.y       -= l.speedY;
-      l.x       += l.drift;
-      l.wobble  += l.wobbleSpd;
-      l.flicker += l.flickerSpd;
+      l.y       -= l.speedY * t;
+      l.x       += l.drift * t;
+      l.wobble  += l.wobbleSpd * t;
+      l.flicker += l.flickerSpd * t;
 
       if (l.y < -90) Object.assign(l, this._makeLantern());
     }
@@ -628,16 +679,41 @@ class WetGlassEffect extends BaseEffect {
    ======================================== */
 export class ThemeEffectsManager {
   constructor(canvas) {
-    this._canvas  = canvas;
-    this._ctx     = canvas.getContext('2d');
-    this._effects = [];
-    this._frame   = null;
+    this._canvas   = canvas;
+    this._ctx      = canvas.getContext('2d');
+    this._effects  = [];
+    this._frame    = null;
+    this._lastTs   = null;  /* for delta-time */
+    this._resizeTimer = null;
+
+    /* Debounced resize */
     this._onResize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }, 120);
     };
     window.addEventListener('resize', this._onResize);
-    this._onResize();
+    /* Immediate initial size */
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    /* Pause / resume loop on visibility change */
+    this._visHandler = () => {
+      if (document.hidden) {
+        /* Tab hidden — cancel RAF, reset timestamp */
+        if (this._frame) { cancelAnimationFrame(this._frame); this._frame = null; }
+        this._lastTs = null;
+      } else {
+        /* Tab visible again — restart loop cleanly */
+        if (this._effects.length > 0 && !this._frame) {
+          this._lastTs = null;
+          this._loop();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', this._visHandler);
   }
 
   /**
@@ -646,9 +722,10 @@ export class ThemeEffectsManager {
    */
   start(names) {
     this.stop();
+    if (!names || names.length === 0) return;
     this._effects = names.map(n => this._create(n)).filter(Boolean);
     this._effects.forEach(e => e.init());
-    this._loop();
+    if (!document.hidden) this._loop();
   }
 
   /** Stop all active effects and clear the canvas. */
@@ -656,6 +733,7 @@ export class ThemeEffectsManager {
     if (this._frame) { cancelAnimationFrame(this._frame); this._frame = null; }
     this._effects.forEach(e => e.destroy());
     this._effects = [];
+    this._lastTs  = null;
     this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
   }
 
@@ -678,15 +756,31 @@ export class ThemeEffectsManager {
     }
   }
 
-  _loop() {
+  _loop(ts) {
+    if (document.hidden) {
+      /* Safety valve — shouldn't normally run if visHandler is working */
+      this._frame  = null;
+      this._lastTs = null;
+      return;
+    }
+
+    /* Delta-time in seconds, capped at 100ms to prevent "catch-up" jumps */
+    const now   = ts ?? performance.now();
+    const rawDt = this._lastTs !== null ? (now - this._lastTs) / 1000 : 0;
+    const dt    = Math.min(rawDt, 0.1);
+    this._lastTs = now;
+
     const { _ctx: ctx, _canvas: c } = this;
     ctx.clearRect(0, 0, c.width, c.height);
-    this._effects.forEach(e => e.update(ctx));
-    this._frame = requestAnimationFrame(() => this._loop());
+    this._effects.forEach(e => e.update(dt));
+
+    this._frame = requestAnimationFrame((t) => this._loop(t));
   }
 
   destroy() {
     this.stop();
     window.removeEventListener('resize', this._onResize);
+    document.removeEventListener('visibilitychange', this._visHandler);
+    clearTimeout(this._resizeTimer);
   }
 }

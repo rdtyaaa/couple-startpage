@@ -17,6 +17,7 @@ import { MarketManager }     from './market.js';
 import { SidebarManager }    from './sidebar.js';
 import { ThemeManager }      from './theme-manager.js';
 import { HolidayManager }    from './holidays.js';
+import { NotesManager }      from './notes.js';
 
 class App {
   constructor() {
@@ -134,11 +135,15 @@ class App {
     const sidebar = new SidebarManager(storage);
     sidebar.init();
 
+    /* Notes */
+    const notes = new NotesManager(storage);
+    notes.init();
+
     /* Store references */
     this._managers = {
       storage, background, greeting, clock,
       search, weather, ql, market,
-      bubble, sidebar, theme, holidays,
+      bubble, sidebar, theme, holidays, notes,
     };
   }
 }

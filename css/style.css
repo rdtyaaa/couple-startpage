@@ -151,7 +151,7 @@ input {
   gap: var(--space-md);
   padding: var(--space-2xl) var(--space-lg);
   z-index: 10;
-  /* Slide transition — NO animation here to avoid override conflict */
+  /* Slide transition â€” NO animation here to avoid override conflict */
   transition:
     transform 380ms var(--ease-out),
     opacity 380ms var(--ease-out);
@@ -1487,7 +1487,7 @@ body.search-mode #search-box {
   border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
-/* ── Birthday Yoga — blue theme ── */
+/* â”€â”€ Birthday Yoga â€” blue theme â”€â”€ */
 body.theme-birthday-yoga {
   --glass-bg: rgba(0, 14, 30, 0.58);
   --glass-bg-hover: rgba(0, 22, 44, 0.68);
@@ -1514,3 +1514,811 @@ body.theme-birthday-yoga #greeting-text {
 body.theme-birthday-yoga #clock-time {
   color: rgba(140, 195, 255, 0.65);
 }
+
+/* ================================================================
+   NOTES FEATURE
+   Left sidebar trigger â†’ center modal | Right sidebar (hideable)
+   ================================================================ */
+
+/* ================================================================
+   RIGHT SIDEBAR â€” mirrors left sidebar visually
+   ================================================================ */
+
+#notes-right-sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-2xl) var(--space-lg);
+  z-index: 10;
+  transition:
+    transform 380ms var(--ease-out),
+    opacity 380ms var(--ease-out);
+  will-change: transform, opacity;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+#notes-right-sidebar::-webkit-scrollbar { width: 3px; }
+#notes-right-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+#notes-right-sidebar.notes-rs--hidden {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- Right Sidebar Header ---- */
+.notes-rs__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.notes-rs__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.notes-rs__title svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.notes-rs__add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.notes-rs__add-btn:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  color: var(--color-text-primary);
+}
+
+.notes-rs__add-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---- Right Sidebar List ---- */
+.notes-rs__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+/* ---- Right Sidebar Empty State ---- */
+.notes-rs__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.notes-rs__empty svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.3;
+}
+
+.notes-rs__empty p {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* ---- Right Sidebar Toggle Button ---- */
+#notes-rs-toggle {
+  position: fixed;
+  right: 260px; /* left edge of right sidebar */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  width: 20px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  box-shadow: -3px 0 16px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  opacity: 0.45;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition:
+    right 380ms var(--ease-out),
+    opacity var(--transition),
+    background var(--transition),
+    border-color var(--transition);
+}
+
+#notes-rs-toggle:hover {
+  opacity: 1;
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+}
+
+#notes-rs-toggle svg {
+  width: 11px;
+  height: 11px;
+  color: var(--color-text-secondary);
+  transition: transform 380ms var(--ease-out);
+  flex-shrink: 0;
+}
+
+/* Collapsed: button moves to viewport right edge */
+#notes-rs-toggle.notes-rs-toggle--collapsed {
+  right: 0;
+}
+
+/* Chevron flips when collapsed */
+#notes-rs-toggle.notes-rs-toggle--collapsed svg {
+  transform: rotate(180deg);
+}
+
+#notes-rs-toggle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   NOTE CARDS (inside right sidebar)
+   ================================================================ */
+
+.note-card-rs {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+  animation: noteCardSlideIn 250ms var(--ease-out) both;
+  flex-shrink: 0;
+}
+
+.note-card-rs:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow);
+}
+
+@keyframes noteCardSlideIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Urgent pulse */
+.note-card-rs--urgent {
+  border-color: rgba(251, 191, 36, 0.28);
+  animation: noteCardSlideIn 250ms var(--ease-out) both, urgentPulseRS 2.2s ease-in-out infinite;
+}
+
+@keyframes urgentPulseRS {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  50%       { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.07); }
+}
+
+.note-card-rs--expired { opacity: 0.5; }
+
+.note-card-rs__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.note-card-rs__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.note-card-rs:hover .note-card-rs__actions {
+  opacity: 1;
+}
+
+.note-card-rs__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+  flex: 1;
+}
+
+.note-card-rs__desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-card-rs__edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.note-card-rs__edit:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border);
+  color: var(--color-text-primary);
+}
+
+.note-card-rs__edit svg {
+  width: 10px;
+  height: 10px;
+}
+
+.note-card-rs__delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.note-card-rs__delete:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.22);
+  color: rgba(248, 113, 113, 0.85);
+}
+
+.note-card-rs__delete svg {
+  width: 10px;
+  height: 10px;
+}
+
+.note-card-rs__footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.note-card-rs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.note-card-rs__link:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-primary);
+}
+
+.note-card-rs__link svg {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+.note-card-rs__time {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+
+/* ---- Badges ---- */
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.note-badge--scheduled {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+}
+
+.note-badge--soon {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  color: rgba(251, 191, 36, 0.9);
+}
+
+.note-badge--hour {
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  color: rgba(96, 165, 250, 0.85);
+}
+
+.note-badge--expired {
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  color: rgba(248, 113, 113, 0.65);
+}
+
+/* ================================================================
+   CENTER MODAL â€” Add Note
+   ================================================================ */
+
+#note-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  pointer-events: none;
+  transition:
+    background 320ms var(--ease),
+    backdrop-filter 320ms var(--ease);
+}
+
+#note-modal-backdrop.note-modal-backdrop--visible {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: all;
+}
+
+#note-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 70;
+  width: min(520px, calc(100vw - 48px));
+  transform: translate(-50%, -48%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  background: var(--glass-bg);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    transform 320ms var(--ease-out),
+    opacity 320ms var(--ease-out);
+  will-change: transform, opacity;
+}
+
+#note-modal.note-modal--open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Body lock when modal is open */
+body.note-modal-body-lock {
+  overflow: hidden;
+}
+
+/* ---- Modal Header ---- */
+.note-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-lg) 0;
+}
+
+.note-modal__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.note-modal__title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.note-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.note-modal__close:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border);
+  color: var(--color-text-primary);
+}
+
+.note-modal__close svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---- Modal Form ---- */
+.note-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.note-modal__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-modal__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.note-modal__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.note-modal__required {
+  color: rgba(248, 113, 113, 0.75);
+}
+
+.note-modal__hint {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.note-modal__input,
+.note-modal__textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: 9px var(--space-md);
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  outline: none;
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.note-modal__input::placeholder,
+.note-modal__textarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.note-modal__input:focus,
+.note-modal__textarea:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
+
+.note-modal__input--date {
+  color-scheme: dark;
+}
+
+/* ---- Modal Actions ---- */
+.note-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding-top: var(--space-xs);
+}
+
+.note-modal__btn {
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-family);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.note-modal__btn:active {
+  transform: scale(0.97);
+}
+
+.note-modal__btn--cancel {
+  background: transparent;
+  border-color: var(--glass-border);
+  color: var(--color-text-secondary);
+}
+
+.note-modal__btn--cancel:hover {
+  background: var(--glass-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.note-modal__btn--submit {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--color-text-primary);
+}
+
+.note-modal__btn--submit:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* ================================================================
+   TOAST REMINDER
+   ================================================================ */
+
+#notes-toast-container {
+  position: fixed;
+  bottom: var(--space-xl);
+  right: var(--space-xl);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  pointer-events: none;
+  align-items: flex-end;
+}
+
+.notes-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow-hover);
+  min-width: 256px;
+  max-width: 312px;
+  pointer-events: all;
+  transform: translateX(calc(100% + var(--space-xl)));
+  opacity: 0;
+  transition:
+    transform 360ms var(--ease-out),
+    opacity 360ms var(--ease-out);
+}
+
+.notes-toast--visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.notes-toast__icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.notes-toast__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.notes-toast__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.notes-toast__msg {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.notes-toast__link {
+  font-size: 11px;
+  color: rgba(96, 165, 250, 0.85);
+  text-decoration: none;
+  margin-top: 2px;
+  transition: color var(--transition-fast);
+}
+
+.notes-toast__link:hover { color: rgb(96, 165, 250); }
+
+.notes-toast__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.notes-toast__close:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.notes-toast__close svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* ================================================================
+   LIGHT THEME OVERRIDES
+   ================================================================ */
+
+[data-theme="light"] #notes-sidebar-btn {
+  color: rgba(0, 0, 0, 0.55);
+}
+[data-theme="light"] #notes-sidebar-btn:hover {
+  color: rgba(0, 0, 0, 0.85);
+}
+[data-theme="light"] #notes-right-sidebar {
+  scrollbar-color: rgba(0, 0, 0, 0.08) transparent;
+}
+[data-theme="light"] .note-modal__input--date {
+  color-scheme: light;
+}
+[data-theme="light"] .note-modal__input,
+[data-theme="light"] .note-modal__textarea {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .note-modal__input:focus,
+[data-theme="light"] .note-modal__textarea:focus {
+  border-color: rgba(0, 0, 0, 0.22);
+  background: rgba(0, 0, 0, 0.07);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] #note-modal {
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+[data-theme="light"] #note-modal-backdrop.note-modal-backdrop--visible {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ================================================================
+   REDUCED MOTION
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  #notes-right-sidebar,
+  #note-modal,
+  #note-modal-backdrop,
+  .notes-toast,
+  .note-card-rs {
+    transition: none;
+    animation: none;
+  }
+  .note-card-rs--urgent { animation: none; }
+}
+
